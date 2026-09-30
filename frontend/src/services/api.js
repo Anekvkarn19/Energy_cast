@@ -10,4 +10,6 @@ export const getMetrics = () => API.get("/metrics");
 
 export const getForecast = () => API.get("/forecast");
 
+export const getCurrentDemand = () => API.get("/current-demand");
+
 export default API;

@@ -24,12 +24,13 @@ function Sidebar({ mobileOpen, setMobileOpen }) {
     { 
       name: "Predict",
       path: "/predict",
-      icon: BrainCircuit },
-    {
-      name: "Model Performance",
-      path: "/model-performance",
-      icon: BrainCircuit,
+      icon: BrainCircuit 
     },
+    // {
+    //   name: "Model Performance",
+    //   path: "/model-performance",
+    //   icon: BrainCircuit,
+    // },
     {
       name: "Analytics",
       path: "/analytics",

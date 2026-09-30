@@ -123,7 +123,25 @@ def metrics():
         "rmse": 405.80,
         "r2": 0.9961
     }
+@app.get("/current-demand")
+def get_current_demand():
+    df = pd.read_csv("data/PJME_hourly.csv")
 
+    df["Datetime"] = pd.to_datetime(df["Datetime"])
+
+    # Handle duplicate timestamps
+    df = (
+        df.groupby("Datetime", as_index=False)["PJME_MW"]
+        .mean()
+        .sort_values("Datetime")
+    )
+
+    latest = df.iloc[-1]
+
+    return {
+        "datetime": latest["Datetime"].isoformat(),
+        "current_demand_MW": round(float(latest["PJME_MW"]), 2)
+    }
 
 # -----------------------------
 # Single Prediction
@@ -165,7 +183,64 @@ def predict(data: PredictionInput):
         "predicted_energy_consumption_MW": round(float(prediction), 2)
     }
 
+# -----------------------------
+# Prediction by Date & Time
+# -----------------------------
+class DateTimePredictionInput(BaseModel):
+    date: str
+    time: str
 
+
+@app.post("/predict-by-datetime")
+def predict_by_datetime(data: DateTimePredictionInput):
+
+    selected_datetime = pd.to_datetime(
+        f"{data.date} {data.time}"
+    ).replace(minute=0, second=0, microsecond=0)
+
+    # Generate the same next 24-hour forecast
+    history = df["PJME_MW"].tolist()
+    last_timestamp = df["Datetime"].iloc[-1]
+
+    predictions = {}
+
+    for i in range(1, 25):
+
+        future_timestamp = last_timestamp + pd.Timedelta(hours=i)
+
+        lag_1 = history[-1]
+        lag_24 = history[-24]
+        lag_168 = history[-168]
+
+        input_features = create_features(
+            future_timestamp,
+            lag_1,
+            lag_24,
+            lag_168
+        )
+
+        prediction = float(model.predict(input_features)[0])
+
+        predictions[future_timestamp] = prediction
+
+        # Use prediction for next recursive step
+        history.append(prediction)
+
+    # Check whether selected date/time exists
+    if selected_datetime not in predictions:
+        return {
+            "error": (
+                "Selected date/time is outside the available "
+                "24-hour forecast window."
+            )
+        }
+
+    return {
+        "datetime": selected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+        "predicted_energy_consumption_MW": round(
+            predictions[selected_datetime], 2
+        )
+    }
 # -----------------------------
 # 24-Hour Forecast
 # -----------------------------

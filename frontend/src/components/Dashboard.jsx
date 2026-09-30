@@ -19,12 +19,17 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-import { getMetrics, getForecast, getHealth } from "../services/api";
+import {
+  getMetrics,
+  getForecast,
+  getHealth,
+  getCurrentDemand,
+} from "../services/api";
 
 function Dashboard() {
   const [metrics, setMetrics] = useState(null);
   const [forecast, setForecast] = useState([]);
+  const [currentDemand, setCurrentDemand] = useState(null);
   const [status, setStatus] = useState("Checking...");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -32,16 +37,21 @@ function Dashboard() {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [healthResponse, metricsResponse, forecastResponse] =
-          await Promise.all([
+        const [
+              healthResponse,
+              metricsResponse,
+             forecastResponse,
+            currentDemandResponse,
+            ] = await Promise.all([
             getHealth(),
-            getMetrics(),
+             getMetrics(),
             getForecast(),
-          ]);
-
+            getCurrentDemand(),
+              ]);
         setStatus(healthResponse.data.status);
         setMetrics(metricsResponse.data);
         setForecast(forecastResponse.data.forecast);
+        setCurrentDemand(currentDemandResponse.data);
       } catch (error) {
         console.error("Dashboard API error:", error);
         setStatus("Offline");
@@ -49,7 +59,6 @@ function Dashboard() {
         setLoading(false);
       }
     };
-
     loadDashboard();
   }, []);
 
@@ -74,234 +83,210 @@ function Dashboard() {
 
   const peakForecast = useMemo(() => {
     if (!forecast.length) return null;
-
     return forecast.reduce((max, item) =>
       item.predicted_MW > max.predicted_MW ? item : max
     );
   }, [forecast]);
+  const peakTime = useMemo(() => {
+  if (!peakForecast) return "--";
+
+  return new Date(peakForecast.datetime).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}, [peakForecast]);
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
-
       {/* Main content */}
       <main>
-
         {/* Topbar */}
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur md:px-8">
-
           <div className="flex items-center justify-between">
-
             <div className="flex items-center gap-3">
-
               <button className="rounded-lg border border-slate-200 p-2 lg:hidden">
                 <Menu size={20} />
               </button>
-
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-blue-600">
                   Energy Analytics
                 </p>
-
                 <h2 className="text-xl font-bold text-slate-900">
                   Forecast Dashboard
                 </h2>
               </div>
-
             </div>
-
-
             <div className="flex items-center gap-3">
-
               <div className="hidden text-right sm:block">
                 <p className="text-sm font-semibold">
                   XGBoost Model
                 </p>
-
                 <p className="text-xs text-slate-500">
                   Production Forecasting
                 </p>
               </div>
-
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                 <BrainCircuit size={20} />
               </div>
-
             </div>
-
           </div>
-
         </header>
-
 
         {/* Content */}
         <section className="p-6 md:p-8">
-
           {/* Hero */}
           <div className="mb-8 overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 p-7 text-white shadow-lg">
-
             <div className="max-w-2xl">
-
               <div className="mb-3 flex items-center gap-2 text-sm text-blue-300">
                 <Zap size={17} />
-                Machine Learning Forecast
+                24-HOUR ENERGY OUTLOOK
               </div>
-
               <h1 className="text-3xl font-bold md:text-4xl">
-                Energy Consumption Forecast
+                Energy Demand Forecast
               </h1>
-
               <p className="mt-3 text-sm leading-6 text-slate-300 md:text-base">
-                Predict hourly electricity demand using historical
-                consumption patterns and an XGBoost forecasting model.
+                Monitor upcoming electricity demand and identify peak
+                consumption periods with hourly forecasts.
               </p>
-
             </div>
-
           </div>
-
-
           {/* KPI cards */}
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+<div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
 
-            {/* MAE */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+  {/* Current Demand */}
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+        <Zap size={20} />
+      </div>
 
-              <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-slate-400">
+        LATEST ACTUAL
+      </span>
+    </div>
 
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                  <Activity size={20} />
-                </div>
+    <p className="mt-5 text-sm text-slate-500">
+      Current Demand
+    </p>
 
-                <span className="text-xs font-medium text-slate-400">
-                  MODEL METRIC
-                </span>
+    <p className="mt-1 text-2xl font-bold">
+      {currentDemand
+        ? `${Math.round(currentDemand.current_demand_MW).toLocaleString()} MW`
+        : "--"}
+    </p>
 
-              </div>
-
-              <p className="mt-5 text-sm text-slate-500">
-                Mean Absolute Error
-              </p>
-
-              <p className="mt-1 text-2xl font-bold">
-                {metrics ? `${metrics.mae} MW` : "--"}
-              </p>
-
-            </div>
-
-
-            {/* RMSE */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-
-              <div className="flex items-center justify-between">
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                  <TrendingUp size={20} />
-                </div>
-
-                <span className="text-xs font-medium text-slate-400">
-                  MODEL METRIC
-                </span>
-
-              </div>
-
-              <p className="mt-5 text-sm text-slate-500">
-                Root Mean Squared Error
-              </p>
-
-              <p className="mt-1 text-2xl font-bold">
-                {metrics ? `${metrics.rmse} MW` : "--"}
-              </p>
-
-            </div>
+    {currentDemand && (
+      <p className="mt-1 text-xs text-slate-500">
+        Latest available reading
+      </p>
+    )}
+  </div>
 
 
-            {/* R2 */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+  {/* Peak Demand */}
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
+        <TrendingUp size={20} />
+      </div>
 
-              <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-slate-400">
+        NEXT 24 HOURS
+      </span>
+    </div>
 
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <BrainCircuit size={20} />
-                </div>
+    <p className="mt-5 text-sm text-slate-500">
+      Peak Demand
+    </p>
 
-                <span className="text-xs font-medium text-slate-400">
-                  MODEL METRIC
-                </span>
+    <p className="mt-1 text-2xl font-bold">
+      {peakForecast
+        ? `${Math.round(peakForecast.predicted_MW).toLocaleString()} MW`
+        : "--"}
+    </p>
 
-              </div>
-
-              <p className="mt-5 text-sm text-slate-500">
-                R² Score
-              </p>
-
-              <p className="mt-1 text-2xl font-bold">
-                {metrics ? metrics.r2 : "--"}
-              </p>
-
-            </div>
+    <p className="mt-1 text-xs text-slate-500">
+      Highest predicted demand
+    </p>
+  </div>
 
 
-            {/* Average */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+  {/* Peak Time */}
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+        <Clock3 size={20} />
+      </div>
 
-              <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-slate-400">
+        PEAK PERIOD
+      </span>
+    </div>
 
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                  <Zap size={20} />
-                </div>
+    <p className="mt-5 text-sm text-slate-500">
+      Peak Time
+    </p>
 
-                <span className="text-xs font-medium text-slate-400">
-                  NEXT 24 HOURS
-                </span>
+    <p className="mt-1 text-2xl font-bold">
+      {peakTime}
+    </p>
 
-              </div>
+    <p className="mt-1 text-xs text-slate-500">
+      Expected highest demand
+    </p>
+  </div>
 
-              <p className="mt-5 text-sm text-slate-500">
-                Average Forecast
-              </p>
 
-              <p className="mt-1 text-2xl font-bold">
-                {averageForecast
-                  ? `${Math.round(averageForecast).toLocaleString()} MW`
-                  : "--"}
-              </p>
+  {/* Average Demand */}
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+        <Gauge size={20} />
+      </div>
 
-            </div>
+      <span className="text-xs font-medium text-slate-400">
+        NEXT 24 HOURS
+      </span>
+    </div>
 
-          </div>
+    <p className="mt-5 text-sm text-slate-500">
+      Average Demand
+    </p>
 
+    <p className="mt-1 text-2xl font-bold">
+      {averageForecast
+        ? `${Math.round(averageForecast).toLocaleString()} MW`
+        : "--"}
+    </p>
+
+    <p className="mt-1 text-xs text-slate-500">
+      Expected average consumption
+    </p>
+  </div>
+
+</div>
 
           {/* Chart + Peak */}
           <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_300px]">
-
             {/* Chart */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
               <div className="mb-6 flex items-center justify-between">
-
                 <div>
                   <h2 className="text-lg font-bold">
                     Next 24 Hours
                   </h2>
-
                   <p className="mt-1 text-sm text-slate-500">
                     Predicted hourly energy consumption
                   </p>
                 </div>
-
                 <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-600">
                   <Clock3 size={15} />
                   24H Forecast
                 </div>
-
               </div>
-
-
               <div className="h-[330px]">
-
                 {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-
                     <LineChart
                       data={chartData}
                       margin={{
@@ -311,19 +296,16 @@ function Dashboard() {
                         bottom: 5,
                       }}
                     >
-
                       <CartesianGrid
                         strokeDasharray="3 3"
                         vertical={false}
                       />
-
                       <XAxis
                         dataKey="time"
                         tick={{ fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
                       />
-
                       <YAxis
                         tick={{ fontSize: 11 }}
                         tickLine={false}
@@ -332,14 +314,12 @@ function Dashboard() {
                           `${Math.round(value / 1000)}K`
                         }
                       />
-
                       <Tooltip
                         formatter={(value) => [
                           `${Number(value).toLocaleString()} MW`,
                           "Forecast",
                         ]}
                       />
-
                       <Line
                         type="monotone"
                         dataKey="consumption"
@@ -348,9 +328,7 @@ function Dashboard() {
                         dot={false}
                         activeDot={{ r: 5 }}
                       />
-
                     </LineChart>
-
                   </ResponsiveContainer>
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
@@ -359,171 +337,131 @@ function Dashboard() {
                       : "Forecast data unavailable"}
                   </div>
                 )}
-
               </div>
-
             </div>
 
+            {/* Demand Insights */}
+<div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
-            {/* Peak card */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+  <p className="text-sm font-medium text-slate-500">
+    Forecast Overview
+  </p>
 
-              <p className="text-sm font-medium text-slate-500">
-                Forecast Overview
-              </p>
+  <h3 className="mt-2 text-xl font-bold">
+    Demand Insights
+  </h3>
 
-              <h3 className="mt-2 text-xl font-bold">
-                Demand Insights
-              </h3>
+  <div className="mt-6 space-y-4">
 
+    {/* Peak Demand */}
+    <div className="rounded-xl bg-slate-50 p-4">
+      <p className="text-xs text-slate-500">
+        Peak predicted demand
+      </p>
 
-              <div className="mt-6 space-y-4">
+      <p className="mt-1 text-xl font-bold">
+        {peakForecast
+          ? `${peakForecast.predicted_MW.toLocaleString()} MW`
+          : "--"}
+      </p>
 
-                <div className="rounded-xl bg-slate-50 p-4">
+      {peakForecast && (
+        <p className="mt-1 text-xs text-slate-500">
+          {new Date(peakForecast.datetime).toLocaleString()}
+        </p>
+      )}
+    </div>
 
-                  <p className="text-xs text-slate-500">
-                    Peak predicted demand
-                  </p>
+    {/* Peak Time */}
+    <div className="rounded-xl bg-slate-50 p-4">
+      <p className="text-xs text-slate-500">
+        Peak period
+      </p>
 
-                  <p className="mt-1 text-xl font-bold">
-                    {peakForecast
-                      ? `${peakForecast.predicted_MW.toLocaleString()} MW`
-                      : "--"}
-                  </p>
+      <p className="mt-1 text-xl font-bold">
+        {peakTime}
+      </p>
 
-                  {peakForecast && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      {new Date(
-                        peakForecast.datetime
-                      ).toLocaleString()}
-                    </p>
-                  )}
+      <p className="mt-1 text-xs text-slate-500">
+        Expected highest demand
+      </p>
+    </div>
 
-                </div>
+    {/* Average Demand */}
+    <div className="rounded-xl bg-slate-50 p-4">
+      <p className="text-xs text-slate-500">
+        Average expected demand
+      </p>
 
+      <p className="mt-1 text-xl font-bold">
+        {averageForecast
+          ? `${Math.round(averageForecast).toLocaleString()} MW`
+          : "--"}
+      </p>
 
-                <div className="rounded-xl bg-slate-50 p-4">
+      <p className="mt-1 text-xs text-slate-500">
+        Across the next 24 hours
+      </p>
+    </div>
 
-                  <p className="text-xs text-slate-500">
-                    Forecast horizon
-                  </p>
-
-                  <p className="mt-1 text-xl font-bold">
-                    24 Hours
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Hourly predictions
-                  </p>
-
-                </div>
-
-
-                <div className="rounded-xl bg-slate-50 p-4">
-
-                  <p className="text-xs text-slate-500">
-                    Active model
-                  </p>
-
-                  <p className="mt-1 text-xl font-bold">
-                    XGBoost
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Gradient boosting regressor
-                  </p>
-
-                </div>
-
-              </div>
-
-            </div>
-
+  </div>
+</div>
           </div>
-
 
           {/* Hourly forecast table */}
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
             <div className="mb-5">
-
               <h2 className="text-lg font-bold">
                 Hourly Forecast
               </h2>
-
               <p className="mt-1 text-sm text-slate-500">
                 Detailed predictions for the next 24 hours
               </p>
-
             </div>
-
-
             <div className="overflow-x-auto">
-
               <table className="w-full min-w-[600px] text-left">
-
                 <thead>
                   <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-400">
-
                     <th className="px-4 py-3">
                       Time
                     </th>
-
                     <th className="px-4 py-3">
                       Date
                     </th>
-
                     <th className="px-4 py-3">
                       Predicted Consumption
                     </th>
-
                   </tr>
                 </thead>
-
-
                 <tbody>
-
                   {forecast.map((item, index) => {
-
                     const date = new Date(item.datetime);
-
                     return (
                       <tr
                         key={index}
                         className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
                       >
-
                         <td className="px-4 py-3 text-sm font-medium">
                           {date.toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
                         </td>
-
                         <td className="px-4 py-3 text-sm text-slate-500">
                           {date.toLocaleDateString()}
                         </td>
-
                         <td className="px-4 py-3 text-sm font-semibold">
                           {item.predicted_MW.toLocaleString()} MW
                         </td>
-
                       </tr>
                     );
                   })}
-
                 </tbody>
-
               </table>
-
             </div>
-
           </div>
-
         </section>
-
       </main>
-
     </div>
   );
 }
